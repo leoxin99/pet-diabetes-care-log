@@ -4,7 +4,7 @@ import { CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, Poin
 import { format, parseISO } from "date-fns";
 import { useApp } from "../../app/AppContext";
 import { Modal } from "../../components/Modal";
-import { formatDateTime, recordSummary, recentRange, recordsInRange } from "../../domain/helpers";
+import { formatDateTime, recordSummary, recentRange, selectRecords } from "../../domain/helpers";
 import type { CareRecord } from "../../domain/schema";
 import { RecordForm } from "./RecordForm";
 
@@ -13,7 +13,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip,
 type Metric = "glucose" | "weight";
 
 export function RecordsPage() {
-  const { state, dispatch } = useApp();
+  const { petRecords, dispatch } = useApp();
   const [days, setDays] = useState(30);
   const [custom, setCustom] = useState(false);
   const [customStart, setCustomStart] = useState(format(recentRange(30).start, "yyyy-MM-dd"));
@@ -26,11 +26,11 @@ export function RecordsPage() {
     const selectedRange = custom
       ? { start: new Date(`${customStart}T00:00:00`), end: new Date(`${customEnd}T23:59:59`) }
       : recentRange(days);
-    return recordsInRange(state.records, selectedRange.start, selectedRange.end);
-  }, [state.records, days, custom, customStart, customEnd]);
+    return selectRecords(petRecords, selectedRange);
+  }, [petRecords, days, custom, customStart, customEnd]);
   const filtered = inRange.filter((record) => filter === "all" ||
     (filter === "glucose" && record.glucose) ||
-    (filter === "meal" && (record.meal || record.insulinAdministration)) ||
+    (filter === "meal" && (record.meal || record.treatments?.length)) ||
     (filter === "weight" && record.weightKg !== undefined) ||
     (filter === "observation" && record.dailyObservation));
   const chartRecords = [...inRange].reverse().filter((record) => metric === "glucose" ? record.glucose : record.weightKg !== undefined);
@@ -63,7 +63,7 @@ export function RecordsPage() {
       </section>
       <section>
         <div className="section-heading"><div><p className="eyebrow">HISTORY</p><h2>历史记录</h2></div><button onClick={() => setEditing({} as CareRecord)}>新增完整记录</button></div>
-        <div className="filter-row">{[["all","全部"],["glucose","血糖"],["meal","进食/注射"],["weight","体重"],["observation","状态"]].map(([value,label]) => <button className={`filter-chip ${filter === value ? "active" : ""}`} key={value} onClick={() => setFilter(value)}>{label}</button>)}</div>
+        <div className="filter-row">{[["all","全部"],["glucose","血糖"],["meal","进食/治疗"],["weight","体重"],["observation","状态"]].map(([value,label]) => <button className={`filter-chip ${filter === value ? "active" : ""}`} key={value} onClick={() => setFilter(value)}>{label}</button>)}</div>
         {filtered.length ? <div className="record-list">{filtered.map((record) => <article className="record-card" key={record.id}>
           <div className="record-head"><time>{formatDateTime(record.recordedAt)}</time><div><button className="text-button" onClick={() => setEditing(record)}>编辑</button><button className="text-button destructive" onClick={() => remove(record)}>删除</button></div></div>
           <ul>{recordSummary(record).map((item) => <li key={item}>{item}</li>)}</ul>

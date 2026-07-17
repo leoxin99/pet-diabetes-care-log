@@ -1,53 +1,55 @@
 # 架构与数据流
 
-## 模块
+## 工作区
 
 ```text
+apps/
+  weapp/                 Taro 4 + React 18 微信小程序原型
+packages/
+  domain/                Zod schema、迁移输入类型、筛选与分析纯函数
+  content/               CareArticle 契约、来源目录和发布门禁
+  platform-adapters/     Browser / WeChat 键值存储适配器
 src/
-  app/          路由、布局、Context + reducer
-  domain/       Zod schema、类型和纯函数
-  storage/      v0.3 localStorage repository
-  features/
-    onboarding/
-    today/
-    records/
-    analytics/
-    reports/
-    settings/
-  demo/         合成演示数据
-  styles/       移动优先与 A4 Print CSS
+  app/                   Web 路由、Context + reducer
+  storage/               v0.5 localStorage repository 与 v0.3 迁移
+  features/              今日、记录、分析、报告、资料、社区、设置
+  community/             治理 schema、风险标记、权限和本机原型仓库
 ```
 
-## 数据流
+Web 与小程序分别使用 React 19 和 React 18；共享包不依赖 DOM、路由或图表。Vite Web 使用独立缓存目录，避免与 Taro 工作区的 React 运行时混用。
+
+## 照护数据流
 
 ```mermaid
 flowchart LR
-  A["记录表单"] --> B["Zod 校验"]
-  B --> C["Context reducer"]
-  C --> D["v0.3 Storage Repository"]
-  C --> E["今日 / 历史"]
-  C --> F["趋势筛选函数"]
-  F --> G["Chart.js 图表"]
-  F --> H["原始数据表 / 报告"]
-  F --> I["数据画像 / 质量检查 / CSV"]
+  A["表单事实"] --> B["Zod v0.5 校验"]
+  B --> C["按 petId 写入"]
+  C --> D["Web localStorage / WeChat 本机存储"]
+  C --> E["共享日期与类型筛选"]
+  E --> F["趋势图"]
+  E --> G["原始表 / CSV / 报告"]
 ```
 
-导入使用以下顺序：
+导入顺序：`解析 → v0.5 或旧 v0.3 全量校验 → 预览 → 下载当前备份 → 用户确认 → 单键替换`。旧键迁移后保留，任一校验错误都在覆盖前终止。
 
-```text
-选择文件 → JSON 解析 → schema v0.3 全量校验 → 数量预览
-→ 用户确认 → 下载当前备份 → 单个 localStorage key 替换
+## 云端边界
+
+```mermaid
+flowchart TB
+  L["本地照护记录"] -. "不自动上传" .-> X["边界"]
+  R["已审核资料"] --> C["资料云端分发（未来）"]
+  P["用户新写的脱敏社区内容"] --> F["云函数鉴权与安全检查（未来）"]
+  F --> M["人工审核"]
+  M --> U["公开社区"]
 ```
 
-任何解析或校验失败都在替换前结束。
+当前没有云端实现。社区页面是独立的本机治理原型，不读取宠物姓名、血糖、治疗量、备注或原始时间线。
 
-## 关键设计决策
+## 关键决策
 
-- 使用 Hash Router，使构建产物可直接部署在 GitHub Pages 子路径。
-- 报告为派生视图，不保存第二份记录。
-- 分析页调用纯函数计算覆盖、分布、完整性和描述性统计，不保存分析副本。
-- 不同血糖单位分组计算，不进行静默转换或合并。
-- 趋势图与表格调用同一范围筛选结果。
-- 胰岛素对象只允许 `administered: true`，并由交互层要求用户再次确认。
-- 每条血糖记录保存单位；档案的默认单位只影响新记录。
-- P0 使用一个版本化存储键，方便原子替换、完整备份和未来迁移。
+- 报告、图表和 CSV 共用 `selectRecords`，不保存分析副本。
+- 所有记录、计划、趋势和报告按当前 `petId` 隔离。
+- 治疗事件只允许 `administered: true`；名称、治疗量和时间均不自动建议。
+- 资料只发布 `reviewed` 且复审日期有效的文章。
+- 社区普通成员不能调用审核状态变更；高风险举报立即隐藏并记录审核动作。
+- 小程序报告当前仅为页面摘要；Canvas 长图和真机兼容仍待验证。

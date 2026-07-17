@@ -5,6 +5,7 @@ import { emptyBundle, loadBundle, saveBundle, type StorageError } from "../stora
 type Action =
   | { type: "replace"; bundle: ExportBundle }
   | { type: "completeOnboarding"; pet: PetProfile; tasks: CareTask[] }
+  | { type: "setActivePet"; id: string }
   | { type: "savePet"; pet: PetProfile }
   | { type: "saveRecord"; record: CareRecord }
   | { type: "deleteRecord"; id: string }
@@ -17,9 +18,10 @@ function reducer(state: ExportBundle, action: Action): ExportBundle {
   switch (action.type) {
     case "replace": return action.bundle;
     case "completeOnboarding":
-      return { ...state, onboardingComplete: true, pets: [action.pet], tasks: action.tasks };
+      return { ...state, onboardingComplete: true, activePetId: action.pet.id, pets: [action.pet], tasks: action.tasks };
+    case "setActivePet": return { ...state, activePetId: action.id };
     case "savePet":
-      return { ...state, pets: state.pets.some((p) => p.id === action.pet.id)
+      return { ...state, activePetId: action.pet.id, pets: state.pets.some((p) => p.id === action.pet.id)
         ? state.pets.map((p) => p.id === action.pet.id ? action.pet : p)
         : [...state.pets, action.pet] };
     case "saveRecord":
@@ -42,6 +44,8 @@ interface AppContextValue {
   dispatch: (action: Action) => boolean;
   storageError: string | null;
   pet?: PetProfile;
+  petRecords: CareRecord[];
+  petTasks: CareTask[];
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -69,7 +73,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  const value = useMemo(() => ({ state, dispatch, storageError, pet: state.pets[0] }), [state, dispatch, storageError]);
+  const value = useMemo(() => {
+    const pet = state.pets.find((item) => item.id === state.activePetId) || state.pets[0];
+    return {
+      state,
+      dispatch,
+      storageError,
+      pet,
+      petRecords: pet ? state.records.filter((record) => record.petId === pet.id) : [],
+      petTasks: pet ? state.tasks.filter((task) => task.petId === pet.id) : [],
+    };
+  }, [state, dispatch, storageError]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 

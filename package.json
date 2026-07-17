@@ -1,8 +1,12 @@
 {
   "name": "pet-diabetes-care-log",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.7.0-alpha.1",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,7 +16,10 @@
     "test:watch": "vitest",
     "test:e2e": "node scripts/run-e2e.mjs",
     "safety": "node scripts/check-safety-copy.mjs",
-    "capture": "node scripts/capture-assets.mjs"
+    "capture": "node scripts/capture-assets.mjs",
+    "build:weapp": "npm run build:weapp --workspace @sugarpet/weapp",
+    "typecheck:weapp": "npm run typecheck --workspace @sugarpet/weapp",
+    "audit:web": "npm audit --omit=dev --workspaces=false"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
