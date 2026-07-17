@@ -5,17 +5,23 @@ import { format } from "date-fns";
 import { useApp } from "../../app/AppContext";
 import { Disclaimer } from "../../components/Disclaimer";
 import { analyzeRecords, recordTypeLabels, recordsToAnalysisCsv, timeBucketLabels } from "../../domain/analytics";
-import { recentRange, recordsInRange } from "../../domain/helpers";
+import { recentRange, selectRecords, type RecordDataType } from "../../domain/helpers";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 export function AnalyticsPage() {
-  const { state, pet } = useApp();
+  const { petRecords, pet } = useApp();
   const [days, setDays] = useState(30);
-  const range = useMemo(() => recentRange(days), [days]);
+  const [custom, setCustom] = useState(false);
+  const [customStart, setCustomStart] = useState(format(recentRange(30).start, "yyyy-MM-dd"));
+  const [customEnd, setCustomEnd] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [typeFilter, setTypeFilter] = useState<RecordDataType | "all">("all");
+  const range = useMemo(() => custom
+    ? { start: new Date(`${customStart}T00:00:00`), end: new Date(`${customEnd}T23:59:59`) }
+    : recentRange(days), [days, custom, customStart, customEnd]);
   const records = useMemo(
-    () => recordsInRange(state.records, range.start, range.end),
-    [state.records, range],
+    () => selectRecords(petRecords, { ...range, types: typeFilter === "all" ? undefined : [typeFilter] }),
+    [petRecords, range, typeFilter],
   );
   const analytics = useMemo(
     () => analyzeRecords(records, range.start, range.end),
@@ -37,7 +43,7 @@ export function AnalyticsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${pet?.name || "糖宠"}_${days}天记录分析_${format(new Date(), "yyyyMMdd")}.csv`;
+    link.download = `${pet?.name || "糖宠"}_${format(range.start, "yyyyMMdd")}-${format(range.end, "yyyyMMdd")}_记录分析.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -53,14 +59,16 @@ export function AnalyticsPage() {
       </header>
 
       <section className="panel analytics-controls">
-        <div className="segmented">{[7, 30, 90].map((value) => <button className={days === value ? "active" : ""} key={value} onClick={() => setDays(value)}>{value} 天</button>)}</div>
+        <div className="segmented">{[7, 30, 90].map((value) => <button className={!custom && days === value ? "active" : ""} key={value} onClick={() => { setDays(value); setCustom(false); }}>{value} 天</button>)}<button className={custom ? "active" : ""} onClick={() => setCustom(true)}>自定义</button></div>
+        {custom && <div className="form-grid date-range"><label>开始日期<input type="date" value={customStart} max={customEnd} onChange={(event) => setCustomStart(event.target.value)} /></label><label>结束日期<input type="date" value={customEnd} min={customStart} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
+        <div className="filter-row" aria-label="记录类型筛选">{[["all", "全部"], ["glucose", "血糖"], ["meal", "进食"], ["treatment", "治疗"], ["weight", "体重"], ["observation", "状态"], ["notes", "备注"]].map(([value, label]) => <button type="button" className={`filter-chip ${typeFilter === value ? "active" : ""}`} key={value} onClick={() => setTypeFilter(value as RecordDataType | "all")}>{label}</button>)}</div>
         <div className="range-caption">{format(range.start, "yyyy-MM-dd")} 至 {format(range.end, "yyyy-MM-dd")}</div>
         <button onClick={downloadCsv} disabled={!records.length}>导出当前范围 CSV</button>
       </section>
 
       <section className="analytics-metrics" aria-label="数据概览">
         <div><small>记录总数</small><strong>{analytics.totalRecords}</strong><span>条</span></div>
-        <div><small>记录覆盖</small><strong>{analytics.coveredDays}/{analytics.rangeDays}</strong><span>{analytics.coverageRate}% 的日期</span></div>
+        <div><small>有记录日期覆盖</small><strong>{analytics.coveredDays}/{analytics.rangeDays}</strong><span>{analytics.coverageRate}% 的日期，仅表示是否有记录</span></div>
         <div><small>有记录日均</small><strong>{analytics.averageRecordsPerCoveredDay}</strong><span>条 / 天</span></div>
         <div><small>数据维度</small><strong>{analytics.activeDimensions}</strong><span>类字段被使用</span></div>
       </section>

@@ -4,12 +4,12 @@ import { Line } from "react-chartjs-2";
 import { CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Tooltip } from "chart.js";
 import { useApp } from "../../app/AppContext";
 import { Disclaimer } from "../../components/Disclaimer";
-import { recordSummary, recentRange, recordsInRange } from "../../domain/helpers";
+import { recordSummary, recentRange, selectRecords, speciesLabels } from "../../domain/helpers";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 export function ReportsPage() {
-  const { state, pet } = useApp();
+  const { petRecords, pet } = useApp();
   const [days, setDays] = useState(14);
   const [custom, setCustom] = useState(false);
   const [customStart, setCustomStart] = useState(format(recentRange(14).start, "yyyy-MM-dd"));
@@ -22,8 +22,8 @@ export function ReportsPage() {
     const selectedRange = custom
       ? { start: new Date(`${customStart}T00:00:00`), end: new Date(`${customEnd}T23:59:59`) }
       : recentRange(days);
-    return recordsInRange(state.records, selectedRange.start, selectedRange.end);
-  }, [state.records, days, custom, customStart, customEnd]);
+    return selectRecords(petRecords, selectedRange);
+  }, [petRecords, days, custom, customStart, customEnd]);
   const coveredDays = new Set(records.map((record) => format(parseISO(record.recordedAt), "yyyy-MM-dd"))).size;
   const glucoseCount = records.filter((record) => record.glucose).length;
   const weightCount = records.filter((record) => record.weightKg !== undefined).length;
@@ -57,7 +57,7 @@ export function ReportsPage() {
           <div><small>血糖记录</small><strong>{glucoseCount} 条</strong></div>
           <div><small>体重记录</small><strong>{weightCount} 条</strong></div>
         </div>
-        <section><h2>宠物档案摘要</h2><p>姓名：{pet?.name} · 物种：小狗 · 品种：{pet?.breed || "未填写"} · 默认血糖单位：{pet?.defaultGlucoseUnit}</p>{pet?.vetName && <p>兽医/机构：{pet.vetName} · 联系方式：{pet.vetContact || "未填写"}</p>}</section>
+        <section><h2>宠物档案摘要</h2><p>姓名：{pet?.name} · 物种：{pet ? speciesLabels[pet.species] : "未填写"} · 品种：{pet?.breed || "未填写"} · 默认血糖单位：{pet?.defaultGlucoseUnit}</p>{pet?.vetName && <p>兽医/机构：{pet.vetName} · 联系方式：{pet.vetContact || "未填写"}</p>}</section>
         {glucoseRecords.length >= 2 && <section className="report-chart-section"><h2>血糖记录图（原始值）</h2><p className="chart-note">图表仅展示所选区间内的用户记录值，不解释医学意义。</p><div className="report-chart"><Line data={glucoseChart} options={{ responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } }} /></div></section>}
         <section><h2>记录时间线</h2>
           {records.length ? <table><thead><tr><th>时间</th><th>用户记录事实与备注</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td>{format(parseISO(record.recordedAt), "MM-dd HH:mm")}</td><td>{recordSummary(record).map((item) => <div key={item}>{item}</div>)}</td></tr>)}</tbody></table>

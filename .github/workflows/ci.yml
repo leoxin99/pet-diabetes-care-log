@@ -23,8 +23,11 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run safety
+      - run: npm run audit:web
       - run: npm test
       - run: npm run build
+      - run: npm run typecheck:weapp
+      - run: npm run build:weapp
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-pages-artifact@v3

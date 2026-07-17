@@ -1,22 +1,22 @@
-# 糖宠照护 Web MVP
+# 糖宠照护
 
-面向第一次长期照护糖尿病小狗的宠物家长，用较少步骤记录已经发生的照护行为和观察事实，并生成便于复诊沟通的材料。
+面向糖尿病犬猫家长的 local-first 照护记录工具：用较少步骤记录已经发生的进食、测量、治疗与日常观察，并整理为便于复诊沟通的事实材料。
 
-> 糖宠照护用于记录、整理和复诊沟通辅助，不提供诊断、治疗建议或胰岛素剂量建议。有关宠物健康和治疗的问题，请咨询兽医。
+> 糖宠照护用于记录、整理和沟通辅助，不提供诊断、治疗方案或个体化治疗量建议。宠物健康与治疗问题请咨询执业兽医。
 
-当前版本：`0.4.0`。这是作品集可运行 MVP，不是医疗设备，也尚未经过目标用户研究和兽医专业审核。
+当前版本：`0.7.0-alpha.1`。犬猫记录主流程已实现；专业资料、微信小程序和社区仍处于带发布门禁的原型阶段，尚未完成真实用户测试或兽医审核。
 
 ![糖宠照护今日页](docs/assets/today-desktop.png)
 
-## 核心闭环
+## 已实现能力
 
-`首次建档 → 查看今日计划 → 快速记录 → 数据质量/描述性分析 → 打印复诊报告`
-
-- 今日：用户自行设置的应用内计划、四类快捷记录和当天时间线。
-- 记录：历史筛选、编辑、删除/撤销，以及血糖和体重原始趋势。
-- 分析：记录覆盖、类型/时段分布、字段完整性、单位一致性、按单位数值摘要和 CSV 导出。
-- 报告：7/14/30 天记录覆盖、事实时间线和用户自行填写的问题。
-- 设置：档案、计划、JSON 备份恢复、合成 Demo 和隐私边界。
+- 犬猫多宠档案、当前宠物切换，以及记录、计划、趋势、分析、CSV 和报告按 `petId` 隔离。
+- schema v0.5 与 `v0.3 → v0.5` 无损迁移；旧键保留用于回滚。
+- 通用已执行治疗记录：胰岛素、口服药和其他治疗均需主动确认，不预填名称或治疗量。
+- 自定义日期与记录类型筛选；“有记录日期覆盖”只描述数据，不代表健康或照护评分。
+- 资料库审核门禁：只有来源可追溯、兽医已审核且未过复审期的原创摘要可公开；当前没有正式文章。
+- 邀请制社区治理原型：新帖统一待审，高风险医学表达不可提前公开，提供收藏、举报和作者删除演示。
+- Taro 微信小程序技术原型：今日、记录、14 天事实摘要和资料四页可编译，照护记录默认只写本机微信存储。
 
 ## 本地运行
 
@@ -25,52 +25,61 @@ npm install
 npm run dev
 ```
 
-浏览器打开终端显示的地址。首次使用可以建立空白档案，也可以在“设置”中加载明确标注的合成 Demo。
+微信小程序原型：
+
+```bash
+npm run typecheck:weapp
+npm run build:weapp
+```
+
+然后在微信开发者工具中导入 `apps/weapp`，项目配置使用 `touristappid`，不代表已有正式 AppID 或发布资格。
 
 ## 验证
 
 ```bash
 npm run lint
 npm run safety
+npm run audit:web
 npm test
 npm run build
-npx playwright install chromium
 npm run test:e2e
+npm run typecheck:weapp
+npm run build:weapp
 ```
 
-当前本地验证结果：ESLint、TypeScript/Vite 构建、安全文案扫描全部通过；Vitest 14/14，通过 Playwright 在 375px、768px、1440px 三档视口运行 9/9 个流程用例。
+最新事实结果见 [测试报告](docs/test-report.md)。Web 生产依赖审计为 0 漏洞；小程序原型的 Taro 上游依赖仍有未解决安全告警，因此不得提交正式发布。
 
 ## 数据与隐私
 
-- 数据保存在当前浏览器的 `localStorage`，键为 `pet-diabetes-care-log:v0.3`；0.4.0 分析功能只读取并派生结果，不改变存储 schema。
-- 无账号、后端、分析 SDK、广告或记录上传。
-- 导入必须通过 Zod schema v0.3 全量校验。
-- 导入和清空前先下载当前数据备份。
-- 修改默认单位不会转换历史记录，每条记录保留自己的原始单位。
+- Web 照护数据保存在 `localStorage` 键 `pet-diabetes-care-log:v0.5`；旧 `v0.3` 键迁移后不删除。
+- 小程序照护数据保存在本机微信存储，不因使用资料或社区自动上传。
+- 社区本机治理原型使用独立存储键，不读取或拼接照护记录。
+- 无广告、分析 SDK 或真实健康数据；Demo 全部为合成数据。
 
-## 技术结构
+## 工程结构
 
-- React + TypeScript + Vite
-- React Router（Hash Router，兼容静态托管）
-- Zod schema + 版本化存储仓库
-- React Context + reducer
-- Chart.js + 原始数据表
-- Vitest + Testing Library + Playwright
-- GitHub Actions + GitHub Pages
+```text
+apps/weapp                 Taro + React 18 小程序原型
+packages/domain            v0.5 schema、筛选、分析纯函数
+packages/content           资料内容契约与审核门禁
+packages/platform-adapters Web / WeChat 存储适配契约
+src                        React 19 + Vite Web 应用
+docs                       研究、审核、治理与交接证据
+```
 
 更多信息：
 
 - [架构与数据流](docs/architecture.md)
-- [记录数据分析设计](docs/data-analysis-design.md)
-- [用户旅程与待验证假设](docs/user-research.md)
-- [安全审核](docs/safety-review.md)
-- [测试报告](docs/test-report.md)
-- [发布清单](docs/release-checklist.md)
-- [合成示例复诊报告](output/pdf/糖宠照护_合成示例复诊报告.pdf)
+- [用户任务测试方案](docs/user-task-test-protocol.md)
+- [兽医字段审核矩阵](docs/vet-field-review.md)
+- [资料发布治理](docs/content-governance.md)
+- [小程序可行性](docs/weapp-feasibility.md)
+- [社区治理](docs/community-governance.md)
+- [交接与 checkpoint](docs/handoff-2026-07-17.md)
 
-## 已知限制
+## 未完成 Gate
 
-- P0 只展示小狗场景；类型层预留猫，但未提供猫专用流程。
-- 网页关闭后不提供系统通知。
-- 无跨设备同步、家庭协作、OCR、检测仪连接和 AI 总结。
-- 真实用户任务成功率、记录耗时和复诊价值尚待测试，项目不会虚构这些结果。
+- 6 名犬猫照护者任务测试与 2 名专业审核者尚未招募完成。
+- 猫专属临床字段和正式资料文章不得在兽医签署前加入。
+- 小程序未完成开发者工具导入、iOS/Android 真机、主体、类目、备案和隐私审核。
+- 社区没有真实账号、CloudBase、图片安全能力、运营 Owner 或 20–30 人邀请测试。

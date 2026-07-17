@@ -1,10 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { careRecordSchema, type CareRecord } from "../../domain/schema";
+import { careRecordSchema, type CareRecord, type TreatmentEvent } from "../../domain/schema";
 import { fromLocalInput, toLocalInput } from "../../domain/helpers";
 import { useApp } from "../../app/AppContext";
 import { Disclaimer } from "../../components/Disclaimer";
 
-export type RecordKind = "meal_insulin" | "glucose" | "weight" | "observation" | "all";
+export type RecordKind = "meal_treatment" | "glucose" | "weight" | "observation" | "all";
 
 const symptoms = ["精神不佳", "呕吐", "腹泻", "行走异常", "食欲变化", "其他不适"];
 
@@ -25,12 +25,16 @@ export function RecordForm({
   const [recordedAt, setRecordedAt] = useState(toLocalInput(existing?.recordedAt));
   const [glucoseValue, setGlucoseValue] = useState(existing?.glucose?.value?.toString() || "");
   const [glucoseContext, setGlucoseContext] = useState(existing?.glucose?.context || "unknown");
-  const [foodName, setFoodName] = useState(existing?.meal?.foodName || localStorage.getItem("pet-care:last-food") || "");
+  const existingTreatment = existing?.treatments?.[0];
+  const [foodName, setFoodName] = useState(existing?.meal?.foodName || localStorage.getItem(`pet-care:last-food:${pet?.id || "default"}`) || "");
   const [foodAmount, setFoodAmount] = useState(existing?.meal?.amount?.toString() || "");
   const [consumedLevel, setConsumedLevel] = useState(existing?.meal?.consumedLevel || "unknown");
-  const [administered, setAdministered] = useState(Boolean(existing?.insulinAdministration));
-  const [confirmed, setConfirmed] = useState(Boolean(existing?.insulinAdministration));
-  const [insulinAmount, setInsulinAmount] = useState(existing?.insulinAdministration?.recordedAmount?.toString() || "");
+  const [administered, setAdministered] = useState(Boolean(existingTreatment));
+  const [confirmed, setConfirmed] = useState(Boolean(existingTreatment));
+  const [treatmentKind, setTreatmentKind] = useState<TreatmentEvent["kind"] | "">(existingTreatment?.kind || "");
+  const [treatmentName, setTreatmentName] = useState(existingTreatment?.name || "");
+  const [treatmentAmount, setTreatmentAmount] = useState(existingTreatment?.recordedAmount?.toString() || "");
+  const [treatmentUnit, setTreatmentUnit] = useState(existingTreatment?.unitLabel || "");
   const [weight, setWeight] = useState(existing?.weightKg?.toString() || "");
   const [waterMl, setWaterMl] = useState(existing?.waterMl?.toString() || "");
   const [appetite, setAppetite] = useState(existing?.dailyObservation?.appetite || "");
@@ -42,7 +46,7 @@ export function RecordForm({
   const [error, setError] = useState("");
 
   const show = useMemo(() => ({
-    meal: kind === "meal_insulin" || kind === "all",
+    meal: kind === "meal_treatment" || kind === "all",
     glucose: kind === "glucose" || kind === "all",
     weight: kind === "weight" || kind === "all",
     observation: kind === "observation" || kind === "all",
@@ -56,7 +60,11 @@ export function RecordForm({
     event.preventDefault();
     if (!pet) return;
     if (administered && !confirmed) {
-      setError("请确认这次注射已经实际完成后再保存。");
+      setError("请确认这次治疗已经实际完成后再保存。");
+      return;
+    }
+    if (administered && !treatmentKind) {
+      setError("请选择已经执行的治疗类型。");
       return;
     }
     const now = new Date().toISOString();
@@ -76,11 +84,13 @@ export function RecordForm({
         unit: foodAmount ? "g" : undefined,
         consumedLevel,
       } : undefined,
-      insulinAdministration: show.meal && administered ? {
+      treatments: show.meal && administered && treatmentKind ? [{
+        kind: treatmentKind,
         administered: true,
-        recordedAmount: numeric(insulinAmount),
-        unitLabel: "单位",
-      } : undefined,
+        name: treatmentName.trim() || undefined,
+        recordedAmount: numeric(treatmentAmount),
+        unitLabel: treatmentUnit.trim() || undefined,
+      }] : undefined,
       weightKg: show.weight ? numeric(weight) : undefined,
       waterMl: show.observation ? numeric(waterMl) : undefined,
       dailyObservation: show.observation ? {
@@ -99,7 +109,7 @@ export function RecordForm({
       setError(result.error.issues[0].message);
       return;
     }
-    if (foodName.trim()) localStorage.setItem("pet-care:last-food", foodName.trim());
+    if (foodName.trim()) localStorage.setItem(`pet-care:last-food:${pet.id}`, foodName.trim());
     if (!dispatch({ type: "saveRecord", record: result.data })) {
       setError("保存失败，表单内容已保留。请检查浏览器存储后重试。");
       return;
@@ -127,11 +137,18 @@ export function RecordForm({
           <label>食物名称（可选）<input value={foodName} onChange={(e) => setFoodName(e.target.value)} placeholder="会记住上次填写内容" /></label>
           <label>食物克数（可选）<input type="number" min="0" step="0.1" value={foodAmount} onChange={(e) => setFoodAmount(e.target.value)} /></label>
         </div>
-        <label className="check-row"><input type="checkbox" checked={administered} onChange={(e) => { setAdministered(e.target.checked); if (!e.target.checked) setConfirmed(false); }} />同时记录一次已经执行的注射</label>
+        <label className="check-row"><input type="checkbox" checked={administered} onChange={(e) => { setAdministered(e.target.checked); if (!e.target.checked) setConfirmed(false); }} />同时记录一次已经执行的治疗</label>
         {administered && <div className="insulin-box">
           <Disclaimer compact />
-          <label>实际记录量（可留空）<input type="number" min="0" step="0.01" value={insulinAmount} onChange={(e) => setInsulinAmount(e.target.value)} placeholder="由你按实际执行填写" /></label>
-          <label className="check-row confirm"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />我确认这次注射已经实际完成</label>
+          <div className="form-grid">
+            <label>治疗类型<select value={treatmentKind} onChange={(e) => setTreatmentKind(e.target.value as TreatmentEvent["kind"] | "")} required>
+              <option value="">请选择</option><option value="insulin">胰岛素注射</option><option value="oral_medication">口服用药</option><option value="other">其他治疗</option>
+            </select></label>
+            <label>名称（可留空）<input value={treatmentName} onChange={(e) => setTreatmentName(e.target.value)} placeholder="只填写实际使用名称" /></label>
+            <label>实际记录量（可留空）<input type="number" min="0" step="0.01" value={treatmentAmount} onChange={(e) => setTreatmentAmount(e.target.value)} placeholder="由你按实际执行填写" /></label>
+            <label>单位（可留空）<input value={treatmentUnit} onChange={(e) => setTreatmentUnit(e.target.value)} placeholder="按包装或兽医方案填写" /></label>
+          </div>
+          <label className="check-row confirm"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />我确认这次治疗已经实际完成</label>
         </div>}
       </fieldset>}
 

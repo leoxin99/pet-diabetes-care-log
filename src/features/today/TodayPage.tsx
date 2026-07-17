@@ -8,22 +8,22 @@ import type { CareTask } from "../../domain/schema";
 import { RecordForm, type RecordKind } from "../records/RecordForm";
 
 const quickActions: { kind: RecordKind; icon: string; label: string; hint: string }[] = [
-  { kind: "meal_insulin", icon: "餐", label: "进食与注射", hint: "记录已发生的进食和注射" },
+  { kind: "meal_treatment", icon: "餐", label: "进食与治疗", hint: "记录已发生的进食和治疗" },
   { kind: "glucose", icon: "糖", label: "血糖", hint: "保存读数与记录场景" },
   { kind: "weight", icon: "重", label: "体重", hint: "建立长期变化记录" },
   { kind: "observation", icon: "观", label: "今日状态", hint: "食欲、饮水、排尿与活动" },
 ];
 
 export function TodayPage() {
-  const { state, pet, storageError } = useApp();
+  const { pet, petRecords, petTasks, storageError } = useApp();
   const [modal, setModal] = useState<{ kind: RecordKind; taskId?: string } | null>(null);
-  const todayRecords = useMemo(() => state.records
+  const todayRecords = useMemo(() => petRecords
     .filter((record) => new Date(record.recordedAt).toDateString() === new Date().toDateString())
-    .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)), [state.records]);
-  const tasks = state.tasks.filter(isTaskScheduledToday).sort((a, b) => a.localTime.localeCompare(b.localTime));
+    .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)), [petRecords]);
+  const tasks = petTasks.filter(isTaskScheduledToday).sort((a, b) => a.localTime.localeCompare(b.localTime));
 
   function openTask(task: CareTask) {
-    const supported: RecordKind[] = ["meal_insulin", "glucose", "weight", "observation"];
+    const supported: RecordKind[] = ["meal_treatment", "glucose", "weight", "observation"];
     setModal({ kind: supported.includes(task.type as RecordKind) ? task.type as RecordKind : "all", taskId: task.id });
   }
 
@@ -42,7 +42,7 @@ export function TodayPage() {
       <section>
         <div className="section-heading"><div><p className="eyebrow">TODAY</p><h2>今日计划</h2></div><a href="#/settings">管理计划</a></div>
         {tasks.length ? <div className="task-list">{tasks.map((task) => {
-          const done = isTaskRecordedToday(task, state.records);
+          const done = isTaskRecordedToday(task, petRecords);
           return <button className="task-row" key={task.id} onClick={() => openTask(task)}>
             <time>{task.localTime}</time><span className="task-main"><strong>{task.title}</strong><small>{taskTypeLabels[task.type]}</small></span>
             <span className={`status-pill ${done ? "done" : ""}`}>{done ? "已记录" : "尚未在本应用记录"}</span>

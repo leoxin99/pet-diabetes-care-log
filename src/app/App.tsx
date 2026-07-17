@@ -7,6 +7,8 @@ const TodayPage = lazy(() => import("../features/today/TodayPage").then((module)
 const RecordsPage = lazy(() => import("../features/records/RecordsPage").then((module) => ({ default: module.RecordsPage })));
 const AnalyticsPage = lazy(() => import("../features/analytics/AnalyticsPage").then((module) => ({ default: module.AnalyticsPage })));
 const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then((module) => ({ default: module.ReportsPage })));
+const ResourcesPage = lazy(() => import("../features/resources/ResourcesPage").then((module) => ({ default: module.ResourcesPage })));
+const CommunityPage = lazy(() => import("../features/community/CommunityPage").then((module) => ({ default: module.CommunityPage })));
 const SettingsPage = lazy(() => import("../features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 
 const navItems = [
@@ -14,8 +16,11 @@ const navItems = [
   { to: "/records", icon: "录", label: "记录" },
   { to: "/analytics", icon: "析", label: "分析" },
   { to: "/reports", icon: "报", label: "报告" },
+  { to: "/resources", icon: "知", label: "资料" },
+  { to: "/community", icon: "助", label: "互助" },
   { to: "/settings", icon: "设", label: "设置" },
 ];
+const bottomNavItems = navItems.filter((item) => ["/today", "/records", "/resources", "/community", "/settings"].includes(item.to));
 
 function AppShell() {
   const { state, pet } = useApp();
@@ -34,12 +39,14 @@ function AppShell() {
             <Route path="/records" element={<RecordsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/resources" element={<ResourcesPage />} />
+            <Route path="/community" element={<CommunityPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/today" replace />} />
           </Routes>
         </Suspense>
       </main>
-      <nav className="bottom-nav no-print">{navItems.map((item) => <NavLink key={item.to} to={item.to}><span>{item.icon}</span><small>{item.label}</small></NavLink>)}</nav>
+      <nav className="bottom-nav no-print">{bottomNavItems.map((item) => <NavLink key={item.to} to={item.to}><span>{item.icon}</span><small>{item.label}</small></NavLink>)}</nav>
     </div>
   );
 }

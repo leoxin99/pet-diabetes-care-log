@@ -1,0 +1,15 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "sugarpet-care-prototype",
+  "description": "糖宠照护微信小程序技术原型，不含正式 AppID",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "compileHotReLoad": false,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram"
+}

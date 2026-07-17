@@ -1,8 +1,8 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../app/AppContext";
 import { Disclaimer } from "../../components/Disclaimer";
-import { careTaskSchema, petProfileSchema, type CareTask, type GlucoseUnit } from "../../domain/schema";
-import { taskTypeLabels } from "../../domain/helpers";
+import { careTaskSchema, petProfileSchema, type CareTask, type GlucoseUnit, type Species } from "../../domain/schema";
+import { speciesLabels, speciesNouns, taskTypeLabels } from "../../domain/helpers";
 import { createDemoBundle } from "../../demo/data";
 import { downloadBundle, parseImport, type StorageError } from "../../storage/repository";
 
@@ -13,29 +13,55 @@ function repeatLabel(days: number[]) {
 }
 
 export function SettingsPage() {
-  const { state, pet, dispatch } = useApp();
+  const { state, pet, petTasks, dispatch } = useApp();
   const fileInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(pet?.name || "");
+  const [species, setSpecies] = useState<Species>(pet?.species || "dog");
   const [breed, setBreed] = useState(pet?.breed || "");
   const [unit, setUnit] = useState<GlucoseUnit>(pet?.defaultGlucoseUnit || "mg/dL");
   const [vetName, setVetName] = useState(pet?.vetName || "");
   const [vetContact, setVetContact] = useState(pet?.vetContact || "");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskTime, setTaskTime] = useState("08:00");
-  const [taskType, setTaskType] = useState<CareTask["type"]>("meal_insulin");
+  const [taskType, setTaskType] = useState<CareTask["type"]>("meal_treatment");
   const [repeatDays, setRepeatDays] = useState([0, 1, 2, 3, 4, 5, 6]);
   const [message, setMessage] = useState("");
+  const [creatingPet, setCreatingPet] = useState(false);
+
+  function loadPetFields(target = pet) {
+    if (!target) return;
+    setName(target.name); setSpecies(target.species); setBreed(target.breed || "");
+    setUnit(target.defaultGlucoseUnit); setVetName(target.vetName || ""); setVetContact(target.vetContact || "");
+  }
+
+  function switchPet(id: string) {
+    const target = state.pets.find((item) => item.id === id);
+    if (!target) return;
+    loadPetFields(target);
+    dispatch({ type: "setActivePet", id });
+  }
+
+  function startNewPet() {
+    setCreatingPet(true); setName(""); setSpecies("dog"); setBreed(""); setUnit("mg/dL"); setVetName(""); setVetContact(""); setMessage("");
+  }
+
+  function cancelNewPet() {
+    setCreatingPet(false); loadPetFields();
+  }
 
   function savePet(event: FormEvent) {
     event.preventDefault();
-    if (!pet) return;
+    if (!pet && !creatingPet) return;
+    const now = new Date().toISOString();
     const result = petProfileSchema.safeParse({
-      ...pet, name, breed: breed || undefined, defaultGlucoseUnit: unit,
-      vetName: vetName || undefined, vetContact: vetContact || undefined, updatedAt: new Date().toISOString(),
+      ...(creatingPet ? { id: crypto.randomUUID(), createdAt: now } : pet),
+      name, species, breed: breed || undefined, defaultGlucoseUnit: unit,
+      vetName: vetName || undefined, vetContact: vetContact || undefined, updatedAt: now,
     });
     if (!result.success) return setMessage(result.error.issues[0].message);
-    dispatch({ type: "savePet", pet: result.data });
-    setMessage("档案已保存。历史记录中的单位不会改变。");
+    if (!dispatch({ type: "savePet", pet: result.data })) return setMessage("档案保存失败，请检查浏览器存储。");
+    setCreatingPet(false);
+    setMessage("档案已保存并设为当前宠物。历史记录中的单位不会改变。");
   }
 
   function addTask(event: FormEvent) {
@@ -74,18 +100,29 @@ export function SettingsPage() {
     dispatch({ type: "clear" });
   }
 
+  function loadDemo() {
+    if (!window.confirm("将用明确标注的合成演示数据替换当前数据。继续前建议先导出备份。是否继续？")) return;
+    const bundle = createDemoBundle();
+    if (!dispatch({ type: "replace", bundle })) return setMessage("合成 Demo 保存失败，请检查浏览器存储。");
+    setCreatingPet(false);
+    loadPetFields(bundle.pets[0]);
+    setMessage("已加载犬猫合成 Demo，并切换到合成犬档案。");
+  }
+
   return (
     <div className="page stack-lg">
       <header className="page-header"><p className="eyebrow">SETTINGS</p><h1>设置与数据</h1><p>你的记录只保存在当前浏览器。请定期导出备份。</p></header>
       {message && <div className="info-banner" role="status">{message}</div>}
-      <section className="panel"><h2>宠物档案</h2><form className="stack" onSubmit={savePet}>
-        <div className="form-grid"><label>小狗名字<input value={name} onChange={(e) => setName(e.target.value)} required /></label><label>品种（可选）<input value={breed} onChange={(e) => setBreed(e.target.value)} /></label>
+      <section className="panel"><div className="section-heading"><div><h2>宠物档案</h2><p className="muted">所有计划、记录、分析和报告都按当前宠物隔离。</p></div><button type="button" className="secondary" onClick={startNewPet}>新增宠物</button></div>
+        {!creatingPet && state.pets.length > 1 && <label>当前宠物<select value={pet?.id || ""} onChange={(event) => switchPet(event.target.value)}>{state.pets.map((item) => <option key={item.id} value={item.id}>{item.name}（{speciesLabels[item.species]}）</option>)}</select></label>}
+        <form className="stack" onSubmit={savePet}>
+        <div className="form-grid"><label>宠物类型<select value={species} onChange={(e) => setSpecies(e.target.value as Species)}><option value="dog">小狗</option><option value="cat">猫咪</option></select></label><label>{speciesNouns[species]}名字<input value={name} onChange={(e) => setName(e.target.value)} required /></label><label>品种（可选）<input value={breed} onChange={(e) => setBreed(e.target.value)} /></label>
           <label>默认血糖单位<select value={unit} onChange={(e) => setUnit(e.target.value as GlucoseUnit)}><option>mg/dL</option><option>mmol/L</option></select></label>
           <label>兽医/机构（可选）<input value={vetName} onChange={(e) => setVetName(e.target.value)} /></label><label>联系方式（可选）<input value={vetContact} onChange={(e) => setVetContact(e.target.value)} /></label></div>
-        <button>保存档案</button>
+        <div className="button-row">{creatingPet && <button type="button" className="secondary" onClick={cancelNewPet}>取消</button>}<button>{creatingPet ? "创建档案" : "保存档案"}</button></div>
       </form></section>
       <section className="panel"><h2>照护计划</h2><p className="muted">计划由你依据兽医给出的方案填写，只生成应用内入口，不发送系统通知。</p>
-        {state.tasks.length ? <div className="task-list settings-tasks">{state.tasks.map((task) => <div className="task-row static" key={task.id}><time>{task.localTime}</time><span className="task-main"><strong>{task.title}</strong><small>{taskTypeLabels[task.type]} · {repeatLabel(task.repeatDays)}</small></span><button className="text-button destructive" onClick={() => dispatch({ type: "deleteTask", id: task.id })}>删除</button></div>)}</div> : <p className="muted">暂无计划。</p>}
+        {petTasks.length ? <div className="task-list settings-tasks">{petTasks.map((task) => <div className="task-row static" key={task.id}><time>{task.localTime}</time><span className="task-main"><strong>{task.title}</strong><small>{taskTypeLabels[task.type]} · {repeatLabel(task.repeatDays)}</small></span><button className="text-button destructive" onClick={() => dispatch({ type: "deleteTask", id: task.id })}>删除</button></div>)}</div> : <p className="muted">当前宠物暂无计划。</p>}
         <form className="form-grid task-form" onSubmit={addTask}>
           <label>事项名称<input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="例如：晚间照护记录" required /></label>
           <label>类型<select value={taskType} onChange={(e) => setTaskType(e.target.value as CareTask["type"])}>{Object.entries(taskTypeLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -98,9 +135,9 @@ export function SettingsPage() {
         <button onClick={() => downloadBundle(state)}>导出完整 JSON</button>
         <button className="secondary" onClick={() => fileInput.current?.click()}>导入 JSON</button>
         <input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={(e) => importFile(e.target.files?.[0])} />
-        <button className="secondary" onClick={() => { if (window.confirm("将用明确标注的合成演示数据替换当前数据。继续前建议先导出备份。是否继续？")) dispatch({ type: "replace", bundle: createDemoBundle() }); }}>加载合成 Demo</button>
+        <button className="secondary" onClick={loadDemo}>加载合成 Demo</button>
         <button className="destructive-button" onClick={clearAll}>备份并清空</button>
-      </div><p className="muted">导入流程会先完整校验 schema v0.3，不兼容或损坏的文件不会覆盖当前数据。</p></section>
+      </div><p className="muted">导入流程会先完整校验 schema v0.5；兼容的 v0.3 备份会迁移，不兼容或损坏的文件不会覆盖当前数据。</p></section>
       <section className="panel"><h2>产品边界与隐私</h2><Disclaimer /><ul className="plain-list"><li>无账号、无云端同步、无广告和分析 SDK。</li><li>不会根据数值判断病情或生成治疗结论。</li><li>不会自动采集检测仪、图片或设备数据。</li><li>若宠物出现紧急不适，请立即联系兽医或动物急诊。</li></ul></section>
     </div>
   );

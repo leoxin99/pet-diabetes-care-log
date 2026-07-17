@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordsInRange } from "./helpers";
+import { recordsInRange, selectRecords } from "./helpers";
 import type { CareRecord } from "./schema";
 
 describe("recordsInRange", () => {
@@ -13,5 +13,16 @@ describe("recordsInRange", () => {
     })) as CareRecord[];
     const result = recordsInRange(records, new Date(2026, 6, 15), new Date(2026, 6, 16));
     expect(result.map((record) => record.id)).toEqual(["2", "1"]);
+  });
+
+  it("scopes selected records by pet and data type", () => {
+    const now = "2026-07-16T08:00:00+08:00";
+    const records = [
+      { id: "dog-glucose", petId: "dog", glucose: { value: 200, unit: "mg/dL" as const, context: "random" as const } },
+      { id: "dog-note", petId: "dog", notes: "观察" },
+      { id: "cat-glucose", petId: "cat", glucose: { value: 180, unit: "mg/dL" as const, context: "random" as const } },
+    ].map((record) => ({ ...record, recordedAt: now, createdAt: now, updatedAt: now })) as CareRecord[];
+    const result = selectRecords(records, { start: new Date(2026, 6, 16), end: new Date(2026, 6, 16), petId: "dog", types: ["glucose"] });
+    expect(result.map((record) => record.id)).toEqual(["dog-glucose"]);
   });
 });

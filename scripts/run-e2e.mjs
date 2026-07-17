@@ -5,6 +5,7 @@ const server = spawn(process.execPath, [
   resolve("node_modules/vite/bin/vite.js"),
   "--host",
   "127.0.0.1",
+  "--force",
 ], {
   cwd: process.cwd(),
   stdio: ["ignore", "ignore", "inherit"],
